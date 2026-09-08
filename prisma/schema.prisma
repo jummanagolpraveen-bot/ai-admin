@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Phase 1: Core
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String     @unique
+  emailVerified DateTime?
+  passwordHash  String
+  role          Role       @default(USER)
+  familyId      String?
+  family        Family?    @relation(fields: [familyId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  reminders     Reminder[]
+  documents     Document[]
+  subscriptions Subscription[]
+  warranties    Warranty[]
+  vehicles      Vehicle[]
+}
+
+enum Role { 
+  USER 
+  ADMIN 
+}
+
+// Phase 4: Family Sharing
+model Family {
+  id        String   @id @default(cuid())
+  name      String
+  members   User[]
+  createdAt DateTime @default(now())
+}
+
+// Phase 1 & 2: Reminders & Intelligence
+model Reminder {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  notes     String?
+  dueDate   DateTime
+  category  ReminderCategory @default(GENERAL)
+  priority  Priority         @default(MEDIUM)
+  status    ReminderStatus   @default(ACTIVE)
+  isRecurring Boolean        @default(false)
+  recurrenceRule String?     
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  @@index([userId, dueDate])
+}
+
+enum ReminderCategory { 
+  BILL 
+  RENEWAL 
+  DEADLINE 
+  SUBSCRIPTION 
+  WARRANTY 
+  VEHICLE 
+  FAMILY 
+  GENERAL 
+}
+
+enum Priority { 
+  LOW 
+  MEDIUM 
+  HIGH 
+}
+
+enum ReminderStatus { 
+  ACTIVE 
+  COMPLETED 
+  SNOOZED 
+  DISMISSED 
+}
+
+// Phase 3: Documents & OCR
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName    String
+  fileUrl     String
+  ocrText     String?
+  extractedData Json?
+  createdAt   DateTime @default(now())
+}
+
+// Phase 4: Life Areas
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  cost      Float
+  billingCycle String 
+  nextBillingDate DateTime
+}
+
+model Warranty {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemName  String
+  expiryDate DateTime
+  receiptUrl String?
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  make      String
+  model     String
+  year      Int
+  nextServiceDate DateTime?
+}
