@@ -1,42 +1,50 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function getVehicles() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  return await prisma.vehicle.findMany({
-    where: { userId: session.user.id },
-    orderBy: { year: 'desc' }
-  });
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select('*')
+    .order('next_service_date', { ascending: true });
+
+  if (error) throw error;
+  
+  return data.map((v: any) => ({
+    ...v,
+    nextServiceDate: v.next_service_date
+  }));
 }
 
 export async function createVehicle(data: any) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.vehicle.create({
-    data: {
-      ...data,
-      year: parseInt(data.year, 10),
-      nextServiceDate: data.nextServiceDate ? new Date(data.nextServiceDate) : null,
-      userId: session.user.id
-    }
+  const { error } = await supabase.from('vehicles').insert({
+    make: data.make,
+    model: data.model,
+    year: parseInt(data.year, 10),
+    next_service_date: data.nextServiceDate ? new Date(data.nextServiceDate).toISOString() : null,
+    user_id: user.id
   });
 
+  if (error) throw error;
   revalidatePath("/vehicles");
 }
 
 export async function deleteVehicle(id: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.vehicle.delete({
-    where: { id, userId: session.user.id }
-  });
+  const { error } = await supabase.from('vehicles').delete().eq('id', id);
 
+  if (error) throw error;
   revalidatePath("/vehicles");
 }

@@ -1,41 +1,51 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function getWarranties() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  return await prisma.warranty.findMany({
-    where: { userId: session.user.id },
-    orderBy: { expiryDate: 'asc' }
-  });
+  const { data, error } = await supabase
+    .from('warranties')
+    .select('*')
+    .order('expiry_date', { ascending: true });
+
+  if (error) throw error;
+  
+  return data.map((w: any) => ({
+    ...w,
+    itemName: w.item_name,
+    expiryDate: w.expiry_date,
+    receiptUrl: w.receipt_url
+  }));
 }
 
 export async function createWarranty(data: any) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.warranty.create({
-    data: {
-      ...data,
-      expiryDate: new Date(data.expiryDate),
-      userId: session.user.id
-    }
+  const { error } = await supabase.from('warranties').insert({
+    item_name: data.itemName,
+    expiry_date: new Date(data.expiryDate).toISOString(),
+    receipt_url: data.receiptUrl || null,
+    user_id: user.id
   });
 
+  if (error) throw error;
   revalidatePath("/warranties");
 }
 
 export async function deleteWarranty(id: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.warranty.delete({
-    where: { id, userId: session.user.id }
-  });
+  const { error } = await supabase.from('warranties').delete().eq('id', id);
 
+  if (error) throw error;
   revalidatePath("/warranties");
 }

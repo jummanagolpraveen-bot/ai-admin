@@ -1,10 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { createClient } from "@/utils/supabase/server";
 import { signupSchema } from "@/lib/validations/auth";
-import { signIn } from "@/auth";
-import { AuthError } from "next-auth";
 
 export async function signupUser(formData: FormData) {
   try {
@@ -17,44 +14,55 @@ export async function signupUser(formData: FormData) {
 
     const { email, password, name } = parsedData.data;
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const supabase = await createClient();
 
-    if (existingUser) {
-      return { error: "User already exists with this email" };
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
+    const { data: authData, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
       },
     });
 
+    if (error) {
+      console.error("Signup error:", error);
+      return { error: error.message || "Failed to create account" };
+    }
+
     return { success: true };
   } catch (error: any) {
-    console.error("Signup error:", error);
+    console.error("Signup exception:", error);
     return { error: `Failed to create account: ${error?.message || "Unknown error"}` };
   }
 }
 
 export async function loginUser(formData: FormData) {
   try {
-    const data = Object.fromEntries(formData.entries());
-    await signIn("credentials", { ...data, redirectTo: "/dashboard" });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case "CredentialsSignin":
-          return { error: "Invalid credentials." }
-        default:
-          return { error: "Something went wrong." }
-      }
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    const supabase = await createClient();
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error("Login error:", error);
+      return { error: error.message || "Invalid login credentials." };
     }
-    throw error;
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Login exception:", error);
+    return { error: `Login failed: ${error?.message || "Unknown error"}` };
   }
+}
+
+export async function logoutUser() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
 }

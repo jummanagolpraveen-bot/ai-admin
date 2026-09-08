@@ -4,10 +4,13 @@ import { useActionState, useState } from "react";
 import { loginUser } from "@/app/actions/auth.actions";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
+
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -15,8 +18,13 @@ export default function LoginPage() {
     setError("");
     const formData = new FormData(e.currentTarget);
     const res = await loginUser(formData);
-    if (res?.error) setError(res.error);
-    setIsPending(false);
+    if (res?.error) {
+      setError(res.error);
+      setIsPending(false);
+    } else if (res?.success) {
+      router.push("/dashboard");
+      router.refresh();
+    }
   }
 
   return (

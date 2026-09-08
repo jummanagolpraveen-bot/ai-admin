@@ -1,42 +1,54 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function getSubscriptions() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  return await prisma.subscription.findMany({
-    where: { userId: session.user.id },
-    orderBy: { nextBillingDate: 'asc' }
-  });
+  const { data: subscriptions, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .order('next_billing_date', { ascending: true });
+
+  if (error) throw error;
+  
+  return subscriptions.map((s: any) => ({
+    ...s,
+    billingCycle: s.billing_cycle,
+    nextBillingDate: s.next_billing_date
+  }));
 }
 
 export async function createSubscription(data: any) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.subscription.create({
-    data: {
-      ...data,
-      cost: parseFloat(data.cost),
-      nextBillingDate: new Date(data.nextBillingDate),
-      userId: session.user.id
-    }
+  const { error } = await supabase.from('subscriptions').insert({
+    name: data.name,
+    cost: parseFloat(data.cost),
+    billing_cycle: data.billingCycle,
+    next_billing_date: new Date(data.nextBillingDate).toISOString(),
+    user_id: user.id
   });
 
+  if (error) throw error;
   revalidatePath("/subscriptions");
 }
 
 export async function deleteSubscription(id: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.subscription.delete({
-    where: { id, userId: session.user.id }
-  });
+  const { error } = await supabase
+    .from('subscriptions')
+    .delete()
+    .eq('id', id); // RLS handles ensuring the user owns the record
 
+  if (error) throw error;
   revalidatePath("/subscriptions");
 }

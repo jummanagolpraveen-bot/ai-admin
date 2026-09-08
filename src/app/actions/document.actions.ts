@@ -1,40 +1,52 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function getDocuments() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  return await prisma.document.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'desc' }
-  });
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  
+  return data.map((d: any) => ({
+    ...d,
+    fileName: d.file_name,
+    fileUrl: d.file_url,
+    ocrText: d.ocr_text,
+    createdAt: d.created_at
+  }));
 }
 
-export async function createDocument(data: { fileName: string; fileUrl: string; ocrText?: string; extractedData?: any }) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+export async function uploadDocument(data: any) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.document.create({
-    data: {
-      ...data,
-      userId: session.user.id
-    }
+  const { error } = await supabase.from('documents').insert({
+    file_name: data.fileName,
+    file_url: data.fileUrl,
+    ocr_text: data.ocrText || null,
+    user_id: user.id
   });
 
+  if (error) throw error;
   revalidatePath("/documents");
 }
 
 export async function deleteDocument(id: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.document.delete({
-    where: { id, userId: session.user.id }
-  });
+  const { error } = await supabase.from('documents').delete().eq('id', id);
 
+  if (error) throw error;
   revalidatePath("/documents");
 }

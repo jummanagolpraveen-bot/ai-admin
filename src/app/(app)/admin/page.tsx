@@ -1,10 +1,11 @@
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function AdminPage() {
-  const session = await auth();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (session?.user?.role !== "ADMIN") {
+  if (user?.user_metadata?.role !== "ADMIN") {
     redirect("/dashboard");
   }
 

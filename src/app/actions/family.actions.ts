@@ -1,34 +1,16 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
-import { revalidatePath } from "next/cache";
+import { createClient } from "@/utils/supabase/server";
 
 export async function getFamily() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: { family: { include: { members: true } } }
-  });
-
-  return user?.family || null;
+  // Family features are disabled in this schema
+  return null;
 }
 
 export async function createFamily(name: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-
-  const family = await prisma.family.create({
-    data: {
-      name,
-      members: {
-        connect: { id: session.user.id }
-      }
-    }
-  });
-
-  revalidatePath("/family");
-  return family;
+  throw new Error("Family features not currently supported in the new Supabase schema.");
 }

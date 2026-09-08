@@ -1,4 +1,5 @@
-import { auth, signOut } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
+import { logoutUser } from "@/app/actions/auth.actions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { 
@@ -14,9 +15,10 @@ import {
 } from "lucide-react";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session?.user) {
+  if (!user) {
     redirect("/login");
   }
 
@@ -52,16 +54,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="p-4 border-t border-neutral-800">
           <div className="flex items-center gap-3 mb-4 px-2">
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-medium">
-              {session.user.name?.charAt(0) || session.user.email?.charAt(0)}
+              {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0)}
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">{session.user.name}</p>
-              <p className="text-xs text-neutral-400 truncate">{session.user.email}</p>
+              <p className="text-sm font-medium text-white truncate">{user.user_metadata?.full_name || "User"}</p>
+              <p className="text-xs text-neutral-400 truncate">{user.email}</p>
             </div>
           </div>
           <form action={async () => {
             "use server";
-            await signOut({ redirectTo: "/login" });
+            await logoutUser();
+            redirect("/login");
           }}>
             <button className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-neutral-400 rounded-lg hover:text-white hover:bg-neutral-800 transition-colors">
               <LogOut className="w-4 h-4" />

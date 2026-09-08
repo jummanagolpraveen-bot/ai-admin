@@ -1,46 +1,58 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function getReminders() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  const reminders = await prisma.reminder.findMany({
-    where: { userId: session.user.id },
-    orderBy: { dueDate: 'asc' }
-  });
+  const { data: reminders, error } = await supabase
+    .from('reminders')
+    .select('*')
+    .order('reminder_date', { ascending: true });
   
-  return reminders;
+  if (error) throw error;
+  
+  return reminders.map((r: any) => ({
+    ...r,
+    dueDate: r.reminder_date,
+    status: r.completed ? "COMPLETED" : "ACTIVE"
+  }));
 }
 
 export async function createReminder(data: any) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  await prisma.reminder.create({
-    data: {
-      ...data,
-      userId: session.user.id
-    }
+  const { error } = await supabase.from('reminders').insert({
+    title: data.title,
+    description: data.notes || '',
+    reminder_date: new Date(data.dueDate).toISOString(),
+    completed: false,
+    user_id: user.id
   });
+
+  if (error) throw error;
 
   revalidatePath("/dashboard");
   revalidatePath("/reminders");
 }
 
 export async function toggleReminderStatus(id: string, currentStatus: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
 
-  const newStatus = currentStatus === "COMPLETED" ? "ACTIVE" : "COMPLETED";
+  const isCompleted = currentStatus === "COMPLETED";
 
-  await prisma.reminder.update({
-    where: { id, userId: session.user.id },
-    data: { status: newStatus as any }
-  });
+  const { error } = await supabase.from('reminders')
+    .update({ completed: !isCompleted })
+    .eq('id', id);
+
+  if (error) throw error;
 
   revalidatePath("/dashboard");
   revalidatePath("/reminders");
