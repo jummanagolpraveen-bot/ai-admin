@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { 
   LayoutDashboard, 
   ListTodo, 
+  CheckSquare,
+  Calendar,
+  Receipt,
   FileText, 
   CreditCard, 
   ShieldCheck, 
@@ -34,12 +37,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-          <NavItem href="/reminders" icon={ListTodo} label="Reminders" />
+          <NavItem href="/tasks" icon={ListTodo} label="Tasks" />
+          <NavItem href="/reminders" icon={CheckSquare} label="Reminders" />
+          <NavItem href="/appointments" icon={Calendar} label="Appointments" />
           <NavItem href="/documents" icon={FileText} label="Documents" />
           
           <div className="pt-4 pb-2">
             <p className="px-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Life Areas</p>
           </div>
+          <NavItem href="/bills" icon={Receipt} label="Bills" />
           <NavItem href="/subscriptions" icon={CreditCard} label="Subscriptions" />
           <NavItem href="/warranties" icon={ShieldCheck} label="Warranties" />
           <NavItem href="/vehicles" icon={Car} label="Vehicles" />
