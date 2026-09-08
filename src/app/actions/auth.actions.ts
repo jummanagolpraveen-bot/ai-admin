@@ -36,9 +36,9 @@ export async function signupUser(formData: FormData) {
     });
 
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signup error:", error);
-    return { error: "Failed to create account" };
+    return { error: `Failed to create account: ${error?.message || "Unknown error"}` };
   }
 }
 
